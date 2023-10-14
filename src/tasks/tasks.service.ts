@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Task, TaskStatus } from './task.model';
 import { v4 as uuidv4 } from 'uuid'
 import { CreateTaskDto } from './dto/create-task.dto';
+import { GetTaskFilterDto } from './dto/get-task-filter.dto';
 @Injectable()
 export class TasksService {
     private tasks: Task[] = []
@@ -9,8 +10,29 @@ export class TasksService {
         return this.tasks
     }
 
+    getTasksWithFilters(taskFilter: GetTaskFilterDto): Task[] {
+        const { status, search } = taskFilter
+        let filteredTasks: Task[] = []
+        let tasks = this.getAllTasks()
+        if (status) {
+            filteredTasks = tasks.filter(task => task.status === status);
+        }
+
+        if (search) {
+            filteredTasks.concat(tasks.filter(task =>
+                task.title.includes(search) || task.description.includes(search)
+            ))
+        }
+
+        return filteredTasks;
+    }
+
     getTaskById(id: String): Task {
-        return this.tasks.find(task => task.id == id);
+        const task = this.tasks.find(task => task.id == id);
+        if (!task) {
+            throw new NotFoundException(`Task With ID ${id} not found`);
+        }
+        return task;
     }
 
     createTask(createTaskDto: CreateTaskDto): Task {
@@ -25,22 +47,17 @@ export class TasksService {
         return task;
     }
 
-
-    deleteTask(id: String): Boolean {
+    deleteTask(id: String): void {
         let index: number = this.tasks.findIndex(task => task.id == id);
         if (index == -1) {
-            return false
+            throw new NotFoundException(`Task With ID ${id} not found`);
         }
         this.tasks.splice(index, 1);
-        return true
     }
 
     updateTask(id: String, status: TaskStatus): Task {
-        const task = this.tasks.find(task => {
-            if (task.id == id) {
-                task.status = status;
-            }
-        });
-        return task
+        const task = this.getTaskById(id);
+        task.status = status;
+        return task;
     }
 }
